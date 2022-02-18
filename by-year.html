@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+
+    <style>
+        .chart-container {
+            max-width: 1050px;
+            margin: 0 auto;
+            font-family: 'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+        }
+
+        svg {
+            overflow: visible;
+        }
+
+        h1 {
+            margin-left: 30px;
+            margin-bottom: 0;
+        }
+
+        .x .tick line {
+            stroke: rgba(0, 0, 0, .2);
+        }
+
+        .y .tick line {
+            stroke: rgba(0, 0, 0, .2);
+        }
+
+        .x .domain {
+            display: none;
+        }
+
+        .y .domain {
+            display: none;
+        }
+
+        .y .tick text {
+            font-size: 14px;
+            fill: #333;
+
+        }
+
+        .x .tick text {
+            font-size: 14px;
+            fill: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="chart-container">
+        <h1 class="headline">
+            Playoff Wins (by Year)
+        </h1>
+
+        <svg width="1050px" height="1000px">
+
+        </svg>
+    </div>
+</body>
+
+<script src="https://d3js.org/d3.v6.min.js"></script>
+
+<script>
+    console.log({ d3 })
+
+    let width = 720;
+    let height = 500;
+
+    let svg = d3.select("body")
+        .select("svg")
+
+    console.log(svg)
+    
+
+    d3.tsv("stats-merged.tsv").then(function (data) {
+
+
+        data.forEach(function (row) {
+            row.year = new Date( row.year + "T00:00")
+            row.playoff_wins = new Number( row.playoff_wins)
+        })
+
+        console.log(data)
+
+        let margin = { top: 30, right: 10, bottom: 10, left: 30 };
+
+        let x = d3.scaleTime()
+            .domain(d3.extent(data.map(function (d) { return d.year }))) //d3 extent
+            .range([margin.left, width - margin.right])
+
+        let y = d3.scaleLinear()
+            .domain([.0001, 38])
+            .range([height - margin.bottom, margin.top])
+
+        let yAxisSettings = d3.axisRight(y) //set axis to the left
+            .ticks(6) //approx how many ticks, the function will not necesarily give you that number
+            .tickSize(width - 35) //size of tick lines
+            .tickPadding(10) //distance from tick labels to tick marks
+            
+
+
+        let xAxisSettings = d3.axisBottom(x)
+            .ticks(10)
+            .tickSize(10)
+            .tickPadding(10)
+
+        //adding to the axes to our chart
+        let xAxisTicks = svg.append("g")
+            .attr("class", "x axis") //give each axis a class
+            .call(xAxisSettings)
+            .attr("transform", `translate(0,${height - margin.bottom})`)
+
+
+        let yAxisTicks = svg.append("g")
+            .attr("class", "y axis")
+            .call(yAxisSettings)
+            .attr("transform", `translate(${margin.left},0)`)
+
+        let line = d3.line() //define a line function
+            .defined(d => !isNaN(d.playoff_wins))
+            .x(function (d) { return x(d.year) }) //accessing date 
+            .y(function (d) { return y(d.playoff_wins) }) //accesssing value 
+
+
+        
+        let grouped_data = d3.group(data, d => d.player_id);
+
+        console.log({grouped_data})
+        let player_ids = Array.from(grouped_data.keys())
+
+
+        let new_date = new Date("Fri Jan 01 2021 00:00:00 GMT-0600 (Central Standard Time)")
+        console.log(new_date)
+
+        let chosen_names = ["Starr", "Tarkenton", "Bradshaw", "Montana", "Elway", "Brady"]
+
+        let circles = svg.append("g")
+            .selectAll(".circle")
+            .data(grouped_data)
+            .join("circle")
+            .attr("cx", d => x(d[1][d[1].length -1].year))
+            .attr("cy", d => y(d[1][d[1].length -1].playoff_wins))
+            .attr("r", d => {
+                if(d[0] == "BradTo00") {
+                    return 5
+                } else if(d[1][d[1].length -1].playoff_wins == 0){
+                    return 0
+                } else {
+                    return 2
+                }
+            })
+            .style("fill", d => {
+                if(d[1][(d[1].length - 1)].year.getTime() == new_date.getTime()) { 
+                    return "blue"
+                } else if(chosen_names.includes(d[1][d[1].length -1].last_name)) {
+                    return "#000000"
+                } else {
+                return "#D3D3D3"
+                }
+            })
+
+        
+
+        let line_path = svg.append("g")
+        .selectAll(".line")
+        .data(grouped_data)
+        .join("path")
+        .attr("class", function(d) {
+            return "line " +  d[0]
+        })
+        .attr("d", function(d) {
+            console.log(d)
+            // console.log(new_date)
+            console.log(d[1].length)
+
+            return line(d[1])
+        })
+        .style("fill", "none")
+        .style("stroke", d => {
+            if(d[1][(d[1].length - 1)].year.getTime() == new_date.getTime()) { 
+                return "blue"
+            } else if(chosen_names.includes(d[1][d[1].length -1].last_name)) {
+                return "#000000"
+            } else {
+                return "#D3D3D3"
+            }
+        })
+        .style("opacity", d=> {
+            if(d[1][(d[1].length - 1)].year.getTime() == new_date.getTime()) { 
+                return 1
+            } else if(chosen_names.includes(d[1][d[1].length -1].last_name)) {
+                return 1
+            } else {
+                return .6
+            }
+        })
+        .style("stroke-width", d => {
+            if(d[0] == "BradTo00") {
+                return "3px"
+            } else {
+                return "1px"
+            }
+
+        })
+
+        let baseline = svg.append("line")
+        .attr("x1", margin.left)
+        .attr("x2", width )
+        .attr("y1", y(0))
+        .attr("y2", y(0))
+        .style("stroke", "black")
+        .style("stroke-width", "2px")
+
+        let labels = svg.append("g")
+            .selectAll("text")
+            .data(grouped_data)
+            .join("text")
+            .attr("x", d => x(d[1][d[1].length -1].year))
+            .attr("y", d => y(d[1][d[1].length -1].playoff_wins))
+            .attr("dx", d => {
+                if(d[0] == "BradTo00") {
+                    return -60
+                } else {
+                    return 7
+                }
+            })
+            .attr("dy", d => {
+                if(d[0] == "BradTo00") {
+                    return -15
+                } else {
+                    return 5
+                }
+            })
+            .text(d => {
+                if(chosen_names.includes(d[1][d[1].length -1].last_name)) {
+                    return d[1][d[1].length -1].last_name
+                } else {
+                    return 
+                }
+            })    
+            .style("fill", "black")
+            .style("font-size", d => {
+                if(d[0] == "BradTo00") {
+                    return "32px"
+                } else {
+                    return "15px"
+                }
+            })
+
+       
+
+            
+
+
+
+
+    })
+
+</script>
